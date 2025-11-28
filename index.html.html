@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>V-ELECTRONICS | FPV & Aerial Systems</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-purple: #bc13fe;
+            --bg-dark: #050505;
+            --glass: rgba(10, 20, 40, 0.65);
+            --border: rgba(0, 243, 255, 0.3);
+            --text-main: #e0f7ff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden; /* Immersive app feel */
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* --- LOADER --- */
+        #loader {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #000; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            transition: opacity 0.8s ease;
+        }
+        .loader-bar {
+            width: 300px; height: 4px; background: #111;
+            margin-top: 20px; position: relative; overflow: hidden;
+        }
+        .loader-progress {
+            position: absolute; top: 0; left: 0; height: 100%; width: 0%;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 20px var(--neon-cyan);
+            animation: load 2s ease-in-out forwards;
+        }
+        @keyframes load { 0% {width: 0%;} 50% {width: 40%;} 100% {width: 100%;} }
+        .glitch-text {
+            font-family: 'Orbitron'; font-size: 24px; letter-spacing: 4px;
+            animation: glitch 1s linear infinite;
+        }
+
+        /* --- 3D CANVAS --- */
+        #canvas-container {
+            position: absolute; inset: 0; z-index: 1;
+            background: radial-gradient(circle at center, #0a101a 0%, #000 100%);
+        }
+
+        /* --- HUD OVERLAY --- */
+        .hud-layer {
+            position: absolute; inset: 0; z-index: 10;
+            pointer-events: none; /* Let clicks pass to 3D */
+            padding: 40px;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        /* SCANLINES */
+        .scanlines {
+            position: absolute; inset: 0; pointer-events: none; z-index: 5;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            animation: scrollScan 10s linear infinite;
+            opacity: 0.6;
+        }
+        @keyframes scrollScan { from {background-position: 0 0;} to {background-position: 0 100%;} }
+
+        /* HEADER */
+        header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            pointer-events: auto; position: relative;
+        }
+        .brand-box {
+            border-left: 4px solid var(--neon-cyan);
+            padding-left: 20px;
+            background: linear-gradient(90deg, rgba(0,243,255,0.1), transparent);
+        }
+        h1 {
+            font-family: 'Orbitron'; font-weight: 900; font-size: 42px;
+            text-transform: uppercase; letter-spacing: 2px;
+            background: linear-gradient(180deg, #fff, var(--neon-cyan));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(0,243,255,0.5));
+        }
+        .sub-brand {
+            font-family: 'Share Tech Mono'; color: var(--neon-purple);
+            letter-spacing: 4px; font-size: 14px; margin-bottom: 5px;
+            text-shadow: 0 0 10px var(--neon-purple);
+        }
+
+        /* NAVIGATION HUD (Desktop) */
+        .nav-hud {
+            display: flex; gap: 2px;
+        }
+        .nav-item {
+            font-family: 'Share Tech Mono'; font-size: 12px;
+            color: var(--neon-cyan); border: 1px solid var(--border);
+            padding: 8px 16px; cursor: pointer; background: rgba(0,0,0,0.5);
+            transition: all 0.3s; clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            text-decoration: none; display: block;
+        }
+        .nav-item:hover {
+            background: var(--neon-cyan); color: #000;
+            box-shadow: 0 0 15px var(--neon-cyan);
+        }
+
+        /* MOBILE MENU & TOGGLE */
+        .mobile-toggle {
+            display: none; flex-direction: column; gap: 6px; 
+            cursor: pointer; padding: 10px; z-index: 20;
+        }
+        .mobile-toggle span {
+            width: 30px; height: 2px; background-color: var(--neon-cyan);
+            transition: 0.3s; box-shadow: 0 0 5px var(--neon-cyan);
+        }
+        .mobile-toggle.active span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+        .mobile-toggle.active span:nth-child(2) { opacity: 0; }
+        .mobile-toggle.active span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+        .mobile-menu {
+            position: absolute; top: 100%; right: 0; width: 200px;
+            background: rgba(5, 10, 20, 0.95);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(15px);
+            display: flex; flex-direction: column;
+            padding: 20px; gap: 15px;
+            transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 15; clip-path: polygon(0 0, 100% 0, 100% 100%, 15% 100%);
+        }
+        .mobile-menu.active { transform: translateX(0); }
+        .mobile-link {
+            font-family: 'Orbitron'; color: #fff; text-decoration: none;
+            font-size: 14px; letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px; transition: 0.3s;
+        }
+        .mobile-link:hover { color: var(--neon-cyan); padding-left: 10px; border-color: var(--neon-cyan); }
+
+        /* MAIN CONTENT */
+        .hero-content {
+            position: absolute; top: 50%; left: 60px; transform: translateY(-50%);
+            max-width: 600px; pointer-events: auto;
+        }
+        h2 {
+            font-family: 'Orbitron'; font-size: 64px; line-height: 0.9;
+            margin-bottom: 20px; text-transform: uppercase;
+            position: relative;
+        }
+        h2 span { display: block; font-size: 28px; color: var(--neon-purple); letter-spacing: 5px; margin-bottom: 10px;}
+        
+        .desc-box {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 0 20px 0 20px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .desc-box::before {
+            content: ''; position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px;
+            border: 1px solid var(--neon-cyan); border-radius: 0 25px 0 25px; opacity: 0.3; z-index: -1;
+        }
+        p {
+            font-size: 18px; line-height: 1.6; color: #aebbc9;
+        }
+
+        /* BUTTONS */
+        .cta-group { display: flex; gap: 20px; }
+        .btn-main {
+            position: relative;
+            padding: 15px 40px;
+            font-family: 'Orbitron'; font-weight: 700; letter-spacing: 2px;
+            color: #000; background: var(--neon-cyan);
+            border: none; cursor: pointer;
+            clip-path: polygon(15% 0, 100% 0, 100% 70%, 85% 100%, 0 100%, 0 30%);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        .btn-main:hover {
+            background: #fff;
+            box-shadow: 0 0 30px var(--neon-cyan);
+            transform: translateX(5px);
+        }
+        .btn-sec {
+            position: relative;
+            padding: 15px 40px;
+            font-family: 'Orbitron'; font-weight: 700; letter-spacing: 2px;
+            color: var(--neon-cyan); background: transparent;
+            border: 1px solid var(--neon-cyan);
+            cursor: pointer;
+            clip-path: polygon(15% 0, 100% 0, 100% 70%, 85% 100%, 0 100%, 0 30%);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        .btn-sec:hover {
+            background: rgba(0, 243, 255, 0.1);
+            text-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        /* STATS HUD (Right Side) */
+        .stats-hud {
+            position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
+            width: 250px; pointer-events: none;
+        }
+        .stat-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 5px;
+        }
+        .stat-label { font-family: 'Share Tech Mono'; color: #666; font-size: 12px; }
+        .stat-val { font-family: 'Orbitron'; color: var(--neon-cyan); font-size: 18px; }
+        
+        /* ANIMATIONS */
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        /* MOBILE RESPONSIVE */
+        @media (max-width: 768px) {
+            .hud-layer { padding: 20px; }
+            /* Header Layout optimization for mobile */
+            header { flex-direction: row; align-items: center; gap: 0; }
+            h1 { font-size: 24px; }
+            h2 { font-size: 42px; }
+            h2 span { font-size: 18px; }
+            
+            /* Hide Desktop Nav, Show Mobile Toggle */
+            .nav-hud { display: none; }
+            .mobile-toggle { display: flex; }
+            
+            .hero-content { top: auto; bottom: 120px; left: 20px; right: 20px; transform: none; }
+            .stats-hud { display: none; }
+            .cta-group { flex-direction: column; width: 100%; }
+            .btn-main, .btn-sec { width: 100%; text-align: center; clip-path: none; border-radius: 4px; }
+            #canvas-container { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loader">
+        <div class="glitch-text" style="color:var(--neon-cyan)">INITIALIZING V-SYSTEMS</div>
+        <div class="loader-bar"><div class="loader-progress"></div></div>
+        <div style="font-family:'Share Tech Mono'; color:#666; margin-top:10px;">LOADING ASSETS...</div>
+    </div>
+
+    <!-- Background Effects -->
+    <div class="scanlines"></div>
+    <div id="canvas-container"></div>
+
+    <!-- Main HUD UI -->
+    <div class="hud-layer">
+        <header>
+            <div class="brand-box">
+                <div class="sub-brand">SYSTEM: ACTIVE</div>
+                <h1>V-ELECTRONICS</h1>
+            </div>
+            
+            <!-- DESKTOP NAV -->
+            <nav class="nav-hud">
+                <a href="index.html" class="nav-item">HOME</a>
+                <a href="shop.html" class="nav-item">SHOP</a>
+                <a href="forum.html" class="nav-item">FORUM</a>
+                <a href="#" class="nav-item" style="color:var(--neon-purple); border-color:var(--neon-purple)">LOGIN_AC</a>
+            </nav>
+
+            <!-- MOBILE TOGGLE -->
+            <div class="mobile-toggle" id="mobileToggle">
+                <span></span><span></span><span></span>
+            </div>
+
+            <!-- MOBILE MENU -->
+            <div class="mobile-menu" id="mobileMenu">
+                <a href="index.html" class="mobile-link">HOME</a>
+                <a href="shop.html" class="mobile-link">SHOP</a>
+                <a href="forum.html" class="mobile-link">FORUM</a>
+                <a href="#" class="mobile-link" style="color:var(--neon-purple)">LOGIN_AC</a>
+            </div>
+        </header>
+
+        <div class="hero-content">
+            <h2>
+                <span>FPV & AERIAL</span>
+                High-Performance<br>Ecosystems
+            </h2>
+            <div class="desc-box">
+                <p>
+                    Frames, motors, ESCs and stacks tuned for cinematic flying, racing and agriculture. 
+                    Precision engineering for the ultimate flight experience.
+                </p>
+            </div>
+            <div class="cta-group">
+                <button class="btn-main" onclick="window.location.href='fpvani.html'">Build Your Drone</button>
+                <button class="btn-sec">See FPV Kits</button>
+            </div>
+        </div>
+
+        <div class="stats-hud">
+            <div style="text-align:right; margin-bottom:10px; font-family:'Orbitron'; color:var(--neon-purple)">TELEMETRY</div>
+            <div class="stat-row">
+                <span class="stat-label">THRUST</span>
+                <span class="stat-val">4.2 KG</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">LATENCY</span>
+                <span class="stat-val">12 MS</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">BATTERY</span>
+                <span class="stat-val">6S LIPO</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">FRAME</span>
+                <span class="stat-val">CARBON X</span>
+            </div>
+            <div style="margin-top:20px; border:1px solid var(--neon-cyan); height:100px; position:relative; overflow:hidden; opacity:0.7;">
+                <!-- Fake graph -->
+                <svg width="100%" height="100%">
+                    <polyline points="0,80 20,60 40,70 60,40 80,50 100,20 120,60 140,30 160,50 180,10 200,40 250,20" 
+                              style="fill:none;stroke:var(--neon-cyan);stroke-width:2" />
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js Implementation -->
+    <script>
+        // MOBILE TOGGLE LOGIC
+        const toggle = document.getElementById('mobileToggle');
+        const menu = document.getElementById('mobileMenu');
+        
+        toggle.addEventListener('click', () => {
+            toggle.classList.toggle('active');
+            menu.classList.toggle('active');
+        });
+
+        // LOADER LOGIC
+        setTimeout(() => {
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loader').style.display = 'none';
+            }, 800);
+        }, 2000);
+
+        // THREE.JS SETUP
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050814, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+        camera.position.y = 2;
+
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        // LIGHTING
+        const ambientLight = new THREE.AmbientLight(0x404040, 2);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0x00f3ff, 2, 50);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
+
+        const purpleLight = new THREE.PointLight(0xbc13fe, 2, 50);
+        purpleLight.position.set(-5, -5, 5);
+        scene.add(purpleLight);
+
+        // DRONE GROUP
+        const droneGroup = new THREE.Group();
+        scene.add(droneGroup);
+
+        // MATERIALS
+        const frameMat = new THREE.MeshStandardMaterial({ 
+            color: 0x111111, 
+            roughness: 0.3, 
+            metalness: 0.8,
+            emissive: 0x001122,
+            emissiveIntensity: 0.2
+        });
+        const neonMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true });
+        const propMat = new THREE.MeshStandardMaterial({ color: 0x333333, transparent: true, opacity: 0.8 });
+
+        // PROCEDURAL DRONE CONSTRUCTION
+        // 1. Main Body
+        const bodyGeo = new THREE.BoxGeometry(1, 0.3, 2);
+        const body = new THREE.Mesh(bodyGeo, frameMat);
+        droneGroup.add(body);
+
+        // 1b. Neon outline on body
+        const bodyLine = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.35, 2.05), neonMat);
+        droneGroup.add(bodyLine);
+
+        // 2. Arms (X Configuration)
+        const armGeo = new THREE.BoxGeometry(0.2, 0.1, 2.5);
+        
+        const arm1 = new THREE.Mesh(armGeo, frameMat);
+        arm1.position.set(1, 0, 1);
+        arm1.rotation.y = Math.PI / 4;
+        droneGroup.add(arm1);
+
+        const arm2 = new THREE.Mesh(armGeo, frameMat);
+        arm2.position.set(-1, 0, 1);
+        arm2.rotation.y = -Math.PI / 4;
+        droneGroup.add(arm2);
+
+        const arm3 = new THREE.Mesh(armGeo, frameMat);
+        arm3.position.set(1, 0, -1);
+        arm3.rotation.y = -Math.PI / 4;
+        droneGroup.add(arm3);
+
+        const arm4 = new THREE.Mesh(armGeo, frameMat);
+        arm4.position.set(-1, 0, -1);
+        arm4.rotation.y = Math.PI / 4;
+        droneGroup.add(arm4);
+
+        // 3. Motors & Props
+        const props = [];
+
+        const motorGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.3, 16);
+        const propGeo = new THREE.BoxGeometry(2.5, 0.02, 0.2);
+
+        function addMotor(x, z) {
+            const motor = new THREE.Mesh(motorGeo, new THREE.MeshStandardMaterial({color: 0xbc13fe}));
+            motor.position.set(x, 0.15, z);
+            droneGroup.add(motor);
+
+            // Propeller
+            const prop = new THREE.Mesh(propGeo, propMat);
+            prop.position.set(0, 0.2, 0);
+            motor.add(prop);
+            props.push(prop);
+        }
+
+        // Positions roughly based on arm ends
+        addMotor(1.8, 1.8);
+        addMotor(-1.8, 1.8);
+        addMotor(1.8, -1.8);
+        addMotor(-1.8, -1.8);
+
+        // 4. Grid Floor (Cyberpunk Style)
+        const gridHelper = new THREE.GridHelper(40, 40, 0x00f3ff, 0x111111);
+        gridHelper.position.y = -2;
+        scene.add(gridHelper);
+
+        // 5. Floating Particles
+        const particlesGeo = new THREE.BufferGeometry();
+        const particlesCount = 700;
+        const posArray = new Float32Array(particlesCount * 3);
+
+        for(let i = 0; i < particlesCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 30;
+        }
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particlesMat = new THREE.PointsMaterial({
+            size: 0.05, color: 0x00f3ff, transparent: true, opacity: 0.6
+        });
+        const particlesMesh = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particlesMesh);
+
+
+        // INTERACTION
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetRotationX = 0;
+        let targetRotationY = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX - window.innerWidth / 2) * 0.001;
+            mouseY = (event.clientY - window.innerHeight / 2) * 0.001;
+        });
+
+        // Touch support for mobile
+        document.addEventListener('touchmove', (event) => {
+            mouseX = (event.touches[0].clientX - window.innerWidth / 2) * 0.002;
+            mouseY = (event.touches[0].clientY - window.innerHeight / 2) * 0.002;
+        });
+
+        // ANIMATION LOOP
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Propeller Spin
+            props.forEach((prop, index) => {
+                // Alternate spin direction for realism
+                const dir = index % 2 === 0 ? 1 : -1;
+                prop.rotation.y += 0.4 * dir;
+            });
+
+            // Drone Idle Float
+            const time = Date.now() * 0.001;
+            droneGroup.position.y = Math.sin(time) * 0.2;
+            
+            // Mouse Interaction (Smooth Lerp)
+            targetRotationY = mouseX * 2;
+            targetRotationX = mouseY * 2;
+
+            droneGroup.rotation.y += 0.05 * (targetRotationY - droneGroup.rotation.y);
+            droneGroup.rotation.x += 0.05 * (targetRotationX - droneGroup.rotation.x);
+            
+            // Rotate Grid slightly
+            gridHelper.rotation.y += 0.001;
+            
+            // Particle animation
+            particlesMesh.rotation.y = -time * 0.05;
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
