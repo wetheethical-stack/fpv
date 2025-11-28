@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>V-ELECTRONICS | SINGULARITY V3 + AI CORE</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-orange: #ff9d00;
+            --neon-blue: #00f3ff;
+            --neon-red: #ff003c;
+            --neon-purple: #bc13fe;
+            --bg-dark: #000000;
+            --hud-bg: rgba(5, 10, 15, 0.8);
+            --border: rgba(0, 243, 255, 0.2);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; cursor: none; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            height: 100vh; width: 100vw;
+            /* Prevent pull-to-refresh on mobile */
+            overscroll-behavior: none;
+        }
+
+        #canvas-container { position: absolute; inset: 0; z-index: 1; }
+
+        /* --- UI LAYER --- */
+        .ui-layer {
+            position: absolute; inset: 0; z-index: 10; pointer-events: none;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 40px;
+            background: radial-gradient(circle at center, transparent 60%, #000 150%);
+            overflow: hidden; /* Ensure UI doesn't scroll */
+        }
+
+        /* HEADER */
+        header {
+            display: flex; justify-content: space-between; pointer-events: auto;
+            align-items: center; transform: perspective(1000px) rotateX(5deg);
+            position: relative;
+            z-index: 200; /* Ensure header stays on top */
+        }
+        .title-block {
+            border-left: 4px solid var(--neon-orange); padding-left: 20px;
+            background: linear-gradient(90deg, rgba(255, 157, 0, 0.15), transparent);
+            box-shadow: 0 0 30px rgba(255,157,0,0.1);
+        }
+        .title-block h1 {
+            font-family: 'Orbitron'; font-size: 48px; color: #fff;
+            text-transform: uppercase; letter-spacing: 4px; margin: 0;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+            line-height: 1;
+        }
+        .title-block span {
+            font-family: 'Share Tech Mono'; color: var(--neon-orange); font-size: 14px; letter-spacing: 4px;
+        }
+        
+        .header-controls { display: flex; gap: 20px; align-items: center; }
+
+        /* NAV HUD */
+        .nav-hud {
+            display: flex; gap: 2px; margin-right: 20px;
+        }
+        .nav-item {
+            font-family: 'Share Tech Mono'; font-size: 12px;
+            color: var(--neon-blue); border: 1px solid var(--border);
+            padding: 10px 16px; cursor: pointer; background: rgba(0,0,0,0.5);
+            transition: all 0.3s; clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            text-decoration: none; display: block;
+        }
+        .nav-item:hover {
+            background: var(--neon-blue); color: #000;
+            box-shadow: 0 0 15px var(--neon-blue);
+        }
+
+        /* BUTTONS */
+        .hud-btn {
+            border: 1px solid var(--neon-blue); color: var(--neon-blue);
+            padding: 10px 24px; background: rgba(0,0,0,0.8);
+            font-family: 'Share Tech Mono'; font-size: 12px; cursor: pointer;
+            pointer-events: auto; transition: 0.3s; 
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            text-transform: uppercase; letter-spacing: 1px;
+            white-space: nowrap; /* Prevent text wrap */
+        }
+        .hud-btn:hover { background: var(--neon-blue); color: #000; box-shadow: 0 0 20px var(--neon-blue); }
+
+        .ai-btn { border: 1px solid var(--neon-purple); color: var(--neon-purple); }
+        .ai-btn:hover { background: var(--neon-purple); color: #fff; box-shadow: 0 0 20px var(--neon-purple); }
+
+        .exit-btn { border: 1px solid var(--neon-red); color: var(--neon-red); font-weight: bold; }
+        .exit-btn:hover { background: var(--neon-red); color: #000; box-shadow: 0 0 20px var(--neon-red); }
+
+        /* MOBILE MENU & TOGGLE */
+        .mobile-toggle {
+            display: none; flex-direction: column; gap: 6px; 
+            cursor: pointer; padding: 10px; z-index: 201;
+            pointer-events: auto;
+        }
+        .mobile-toggle span {
+            width: 30px; height: 2px; background-color: var(--neon-blue);
+            transition: 0.3s; box-shadow: 0 0 5px var(--neon-blue);
+        }
+        .mobile-toggle.active span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+        .mobile-toggle.active span:nth-child(2) { opacity: 0; }
+        .mobile-toggle.active span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+        .mobile-menu {
+            position: absolute; top: 0; right: 0; width: 250px; height: 100vh;
+            background: rgba(5, 10, 20, 0.98);
+            border-left: 1px solid var(--border);
+            backdrop-filter: blur(15px);
+            display: flex; flex-direction: column;
+            padding: 80px 20px 20px 20px; gap: 20px;
+            transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 200; 
+            pointer-events: auto;
+        }
+        .mobile-menu.active { transform: translateX(0); }
+        .mobile-link {
+            font-family: 'Orbitron'; color: #fff; text-decoration: none;
+            font-size: 16px; letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 12px; transition: 0.3s;
+        }
+        .mobile-link:hover { color: var(--neon-blue); padding-left: 10px; border-color: var(--neon-blue); }
+
+        /* TERMINAL LOG */
+        .terminal-window {
+            position: absolute; left: 40px; top: 30%; width: 300px;
+            font-family: 'Share Tech Mono'; font-size: 11px; color: var(--neon-blue);
+            opacity: 0.8; pointer-events: none;
+            border-left: 1px solid rgba(0, 243, 255, 0.2);
+            padding-left: 15px;
+            background: linear-gradient(90deg, rgba(0,243,255,0.05), transparent);
+            transition: opacity 0.3s;
+        }
+        .log-line { margin-bottom: 6px; opacity: 0.6; transition: opacity 0.2s; }
+        .log-line.new { opacity: 1; color: #fff; text-shadow: 0 0 8px var(--neon-blue); }
+        .log-line::before { content: 'SYS // '; color: var(--neon-orange); margin-right: 5px; }
+
+        /* INSPECTOR - OPTIMIZED FOR MOBILE */
+        .inspector-panel {
+            position: absolute; right: 40px; top: 15%; width: 400px;
+            max-height: 70vh; overflow-y: auto;
+            background: rgba(5, 8, 15, 0.95);
+            border: 1px solid var(--border);
+            padding: 30px; transform: translateX(150%) skewX(-5deg); 
+            transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            pointer-events: auto; display: flex; flex-direction: column; gap: 15px;
+            backdrop-filter: blur(15px);
+            box-shadow: -20px 20px 60px rgba(0,0,0,0.8);
+            z-index: 100;
+        }
+        .inspector-panel.active { transform: translateX(0) skewX(-5deg); }
+        
+        .part-title {
+            font-family: 'Orbitron'; font-size: 28px; color: #fff;
+            border-bottom: 2px solid var(--neon-blue); padding-bottom: 10px;
+            text-shadow: 0 0 20px var(--neon-blue);
+        }
+        
+        #specsContainer { display: flex; flex-direction: column; gap: 8px; }
+
+        .stat-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-family: 'Share Tech Mono'; font-size: 13px; color: #888;
+            border-bottom: 1px solid rgba(255,255,255,0.05); padding: 6px 0;
+        }
+        .stat-row b { color: var(--neon-blue); font-size: 14px; letter-spacing: 1px;}
+        
+        .spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .spec-box {
+            background: rgba(0, 243, 255, 0.05); border: 1px solid var(--border);
+            padding: 10px; text-align: center;
+        }
+        .spec-box small { display: block; font-size: 10px; color: var(--neon-orange); margin-bottom: 3px; letter-spacing: 1px; }
+        .spec-box span { font-family: 'Orbitron'; font-size: 14px; }
+
+        /* AI CHATBOT WINDOW - RESPONSIVE */
+        .chat-container {
+            position: absolute; left: 40px; bottom: 140px; width: 320px; height: 400px;
+            background: rgba(10, 5, 15, 0.95); border: 1px solid var(--neon-purple);
+            display: none; flex-direction: column; pointer-events: auto; z-index: 150;
+            box-shadow: 0 0 40px rgba(188, 19, 254, 0.2);
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+        .chat-container.active { display: flex; }
+        
+        .chat-header {
+            padding: 12px; background: rgba(188, 19, 254, 0.1); border-bottom: 1px solid var(--neon-purple);
+            display: flex; justify-content: space-between; align-items: center;
+            font-family: 'Orbitron'; color: var(--neon-purple); letter-spacing: 2px;
+        }
+        .chat-messages {
+            flex: 1; padding: 15px; overflow-y: auto; font-family: 'Share Tech Mono'; font-size: 12px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .msg { padding: 8px 12px; border-radius: 4px; max-width: 90%; line-height: 1.4; word-wrap: break-word; }
+        .msg.ai { background: rgba(188, 19, 254, 0.1); border-left: 2px solid var(--neon-purple); color: #fff; align-self: flex-start; }
+        .msg.user { background: rgba(0, 243, 255, 0.1); border-right: 2px solid var(--neon-blue); color: #fff; align-self: flex-end; text-align: right; }
+        
+        .chat-input-area {
+            padding: 12px; border-top: 1px solid #333; display: flex; gap: 5px;
+        }
+        .chat-input {
+            flex: 1; background: #000; border: 1px solid #444; padding: 8px; color: #fff;
+            font-family: 'Share Tech Mono'; outline: none; transition: 0.3s;
+        }
+        .chat-input:focus { border-color: var(--neon-purple); }
+        .send-btn {
+            background: var(--neon-purple); border: none; color: #fff; padding: 0 15px; cursor: pointer;
+            font-weight: bold; font-family: 'Orbitron';
+        }
+
+        /* ASSEMBLY DOCK - RESPONSIVE */
+        .assembly-dock {
+            width: 100%; max-width: 1200px; margin: 0 auto;
+            pointer-events: auto; position: relative; z-index: 50;
+        }
+        
+        .scrubber-track {
+            width: 100%; height: 2px; background: rgba(255,255,255,0.1);
+            position: relative; display: flex; align-items: center;
+        }
+        .scrubber-fill {
+            position: absolute; left: 0; height: 2px; background: var(--neon-orange);
+            box-shadow: 0 0 20px var(--neon-orange); width: 0%;
+        }
+        
+        input[type="range"] {
+            position: absolute; width: 100%; height: 40px; opacity: 0; cursor: pointer; z-index: 20;
+            touch-action: none; /* Fix for mobile dragging */
+        }
+        
+        .thumb-visual {
+            position: absolute; left: 0%; width: 40px; height: 40px;
+            background: rgba(0,0,0,0.8); border: 1px solid var(--neon-orange);
+            transform: translate(-50%, 0) rotate(45deg);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 30px var(--neon-orange);
+            transition: box-shadow 0.2s; pointer-events: none;
+        }
+        .thumb-visual::after {
+            content:''; width: 10px; height: 10px; background: var(--neon-orange);
+        }
+
+        .stages {
+            display: flex; justify-content: space-between; margin-top: 25px;
+            font-family: 'Orbitron'; font-size: 12px; color: #444; letter-spacing: 2px;
+        }
+        .stg { transition: 0.3s; cursor: pointer; position: relative; }
+        .stg::before {
+            content:''; position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+            width: 2px; height: 10px; background: #444; transition: 0.3s;
+        }
+        .stg.active { color: var(--neon-blue); text-shadow: 0 0 20px var(--neon-blue); }
+        .stg.active::before { background: var(--neon-blue); height: 15px; top: -33px; box-shadow: 0 0 10px var(--neon-blue); }
+
+        /* LOADER & CURSOR */
+        #loader {
+            position: fixed; inset: 0; z-index: 9999; background: #000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-family: 'Orbitron'; color: var(--neon-orange); letter-spacing: 10px;
+            transition: opacity 0.8s;
+            padding: 20px; text-align: center;
+        }
+        #loader h1 { font-size: clamp(24px, 5vw, 48px); }
+        
+        .cursor-target {
+            position: fixed; width: 40px; height: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 50%;
+            pointer-events: none; transform: translate(-50%, -50%);
+            z-index: 9999; mix-blend-mode: difference; transition: width 0.1s, height 0.1s;
+        }
+        .cursor-dot {
+            position: fixed; width: 4px; height: 4px; background: var(--neon-orange);
+            border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 9999;
+        }
+        .cursor-target.hovered {
+            width: 80px; height: 80px; border-color: var(--neon-blue);
+            border-width: 2px; background: rgba(0, 243, 255, 0.1);
+        }
+
+        /* --- MEDIA QUERIES (OPTIMIZATION) --- */
+        @media (max-width: 1024px) {
+            .title-block h1 { font-size: 32px; letter-spacing: 2px; }
+            .ui-layer { padding: 20px; }
+            .terminal-window { display: none; } /* Hide log on tablets to save space */
+        }
+
+        @media (max-width: 768px) {
+            /* General Layout */
+            body { cursor: auto; } /* Use default cursor on mobile */
+            .cursor-dot, .cursor-target { display: none; } /* Hide custom cursor */
+            .ui-layer { padding: 15px; }
+            
+            /* Header */
+            header { flex-direction: row; align-items: center; gap: 0; transform: none; }
+            .title-block h1 { font-size: 20px; letter-spacing: 1px; }
+            .title-block span { font-size: 10px; }
+            .nav-hud { display: none; } /* Hide Desktop Nav */
+            .header-controls { display: none; } /* Hide Desktop Buttons */
+            .mobile-toggle { display: flex; margin-left: auto; } /* Show Toggle */
+            
+            /* Bottom Sheets behavior for Inspector & Chat */
+            .inspector-panel { 
+                width: 100%; right: 0; top: auto; bottom: 0; 
+                transform: translateY(100%); clip-path: none; border-left: none; border-right: none; border-bottom: none;
+                border-top: 2px solid var(--neon-blue);
+                height: 50vh; padding: 20px;
+                border-radius: 20px 20px 0 0;
+            }
+            .inspector-panel.active { transform: translateY(0); }
+            
+            .chat-container { 
+                width: 100%; left: 0; bottom: 0; height: 60vh;
+                border: none; border-top: 2px solid var(--neon-purple);
+                border-radius: 20px 20px 0 0;
+            }
+            
+            /* Assembly Slider */
+            .assembly-dock { margin-bottom: 20px; }
+            .stages { display: none; } /* Hide text stages on small mobile */
+            .thumb-visual { width: 30px; height: 30px; }
+        }
+
+        @media (max-height: 600px) {
+            .ui-layer { padding: 10px; }
+            .title-block { display: none; } /* Hide title in landscape mode on phones */
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <h1>SINGULARITY V3</h1>
+        <div style="font-size:12px; margin-top:20px; color:#666; font-family:'Share Tech Mono'">INITIALIZING AUDIO KERNEL...</div>
+    </div>
+    
+    <div class="cursor-dot" id="cursorDot"></div>
+    <div class="cursor-target" id="cursorRing"></div>
+
+    <div class="ui-layer">
+        <header>
+            <div class="title-block">
+                <h1>Drone Architect</h1>
+                <span>SYSTEM: ONLINE // GLITCH_MOD: ACTIVE</span>
+            </div>
+            
+            <nav class="nav-hud">
+                <a href="index.html" class="nav-item">HOME</a>
+                <a href="shop.html" class="nav-item">SHOP</a>
+                <a href="forum.html" class="nav-item">FORUM</a>
+            </nav>
+
+            <div class="header-controls">
+                <button class="hud-btn ai-btn" onclick="toggleChat()">NEURAL LINK</button>
+                <button class="hud-btn" id="audioInitBtn">ENABLE AUDIO</button>
+                <button class="hud-btn exit-btn" onclick="window.location.href='index.html'">[X] EXIT</button>
+            </div>
+
+            <div class="mobile-toggle" id="mobileToggle">
+                <span></span><span></span><span></span>
+            </div>
+
+            <div class="mobile-menu" id="mobileMenu">
+                <a href="index.html" class="mobile-link">HOME</a>
+                <a href="shop.html" class="mobile-link">SHOP</a>
+                <a href="forum.html" class="mobile-link">FORUM</a>
+                <a href="#" class="mobile-link" onclick="toggleChat(); document.getElementById('mobileToggle').click();">AI CHAT</a>
+                <a href="#" class="mobile-link" id="mobAudioBtn">ENABLE AUDIO</a>
+                <a href="index.html" class="mobile-link" style="color:var(--neon-red)">EXIT SYSTEM</a>
+            </div>
+        </header>
+
+        <div class="terminal-window" id="terminal">
+            <div class="log-line">V-OS KERNEL LOADED.</div>
+            <div class="log-line">ENVIRONMENT MAP: GENERATED.</div>
+            <div class="log-line">DIAGNOSTIC LASER: STANDBY.</div>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="chat-header">
+                <span>V-ASSISTANT AI</span>
+                <span style="cursor:pointer;" onclick="toggleChat()">[CLOSE]</span>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="msg ai">Neural Link Established. Ask me about the drone specs (Motor, Frame, Camera, Battery).</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" class="chat-input" id="chatInput" placeholder="Query database..." onkeypress="if(event.key==='Enter') sendChat()">
+                <button class="send-btn" onclick="sendChat()">></button>
+            </div>
+        </div>
+
+        <div class="inspector-panel" id="inspector">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div class="part-title" id="partName" style="margin-bottom:0; border-bottom:none;">--</div>
+                <button class="hud-btn" style="padding:5px 10px; font-size:10px;" onclick="closeInspector()">CLOSE</button>
+            </div>
+            <div id="specsContainer"></div>
+            <div class="spec-grid" id="gridContainer"></div>
+            <p style="font-size:12px; line-height:1.6; color:#aaa; margin-top:15px; border-top:1px solid rgba(255,255,255,0.1); padding-top:15px;" id="partDesc">--</p>
+        </div>
+
+        <div class="assembly-dock">
+            <div class="scrubber-track">
+                <div class="scrubber-fill" id="scrubberFill"></div>
+                <div class="thumb-visual" id="scrubberThumb"></div>
+                <input type="range" id="assemblySlider" min="0" max="100" value="0">
+            </div>
+            <div class="stages">
+                <span class="stg active">EXPLODED</span>
+                <span class="stg">CHASSIS</span>
+                <span class="stg">DRIVETRAIN</span>
+                <span class="stg">COMPUTE</span>
+                <span class="stg">OPTICS</span>
+                <span class="stg">READY</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- 0. AI KNOWLEDGE BASE ---
+        const droneData = {
+            "motor": "The 2306 1750KV motors are designed for 6S voltage. They feature N52 arc magnets and a titanium hollow shaft for maximum durability.",
+            "frame": "The TITAN X5 is a Unibody Carbon Fiber frame. It uses T700 grade carbon with a 5.5mm thickness, ensuring high rigidity and crash resistance.",
+            "stack": "The F7 Hybrid Stack combines an F722 Flight Controller with a 60A BLHeli_32 ESC. It supports Betaflight and has 128MB Blackbox logging.",
+            "camera": "The O3 Air Unit provides 4K 60FPS recording with RockSteady stabilization. It transmits low-latency 1080p video to the goggles.",
+            "video": "The O3 Air Unit provides 4K 60FPS recording with RockSteady stabilization. It transmits low-latency 1080p video to the goggles.",
+            "antenna": "A 5.8GHz Long Range Antenna with RHCP polarization. It ensures a stable video feed even behind obstacles.",
+            "battery": "Recommended battery: 6S 1300mAh LiPo (100C). This provides flight times of approx 5-7 minutes.",
+            "prop": "Recommended props: 5143 Tri-blade. Balanced for smooth freestyle flight.",
+            "default": "I can provide details on the Frame, Motors, Stack, Camera, or Antenna. Please specify a component."
+        };
+
+        // CHAT FUNCTIONS
+        function toggleChat() {
+            const chat = document.getElementById('chatContainer');
+            // Close inspector if chat opens on mobile to prevent overlap
+            if(window.innerWidth <= 768) document.getElementById('inspector').classList.remove('active');
+            chat.classList.toggle('active');
+            if(chat.classList.contains('active')) {
+                setTimeout(() => document.getElementById('chatInput').focus(), 100);
+            }
+        }
+
+        function closeInspector() {
+            document.getElementById('inspector').classList.remove('active');
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            const msgs = document.getElementById('chatMessages');
+            const txt = input.value.trim().toLowerCase();
+            
+            if(!txt) return;
+
+            // User Msg
+            msgs.innerHTML += `<div class="msg user">${input.value}</div>`;
+            input.value = '';
+
+            // AI Logic
+            let response = droneData.default;
+            for (const key in droneData) {
+                if (txt.includes(key)) {
+                    response = droneData[key];
+                    break;
+                }
+            }
+
+            // Simulate Delay
+            setTimeout(() => {
+                msgs.innerHTML += `<div class="msg ai">${response}</div>`;
+                msgs.scrollTop = msgs.scrollHeight;
+                triggerGlitchSound(); // Sound feedback
+            }, 500);
+        }
+
+        // MOBILE TOGGLE
+        const toggle = document.getElementById('mobileToggle');
+        const menu = document.getElementById('mobileMenu');
+        toggle.addEventListener('click', () => {
+            toggle.classList.toggle('active');
+            menu.classList.toggle('active');
+        });
+
+        // MOBILE AUDIO INIT
+        document.getElementById('mobAudioBtn').addEventListener('click', () => {
+            initAudio();
+            toggle.click(); // Close menu
+        });
+
+        // --- 1. AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let motorOsc, lfoOsc, gainNode, filterNode;
+        let glitchOsc, glitchGain;
+        let audioEnabled = false;
+
+        function initAudio() {
+            if(audioCtx) return;
+            audioCtx = new AudioContext();
+            motorOsc = audioCtx.createOscillator();
+            motorOsc.type = 'sawtooth';
+            motorOsc.frequency.value = 50; 
+            lfoOsc = audioCtx.createOscillator();
+            lfoOsc.type = 'sine';
+            lfoOsc.frequency.value = 10;
+            glitchOsc = audioCtx.createOscillator();
+            glitchOsc.type = 'square';
+            glitchOsc.frequency.value = 50;
+            glitchGain = audioCtx.createGain();
+            glitchGain.gain.value = 0;
+            filterNode = audioCtx.createBiquadFilter();
+            filterNode.type = 'lowpass';
+            filterNode.frequency.value = 200;
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0;
+            lfoOsc.connect(filterNode.frequency);
+            motorOsc.connect(filterNode);
+            filterNode.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            glitchOsc.connect(glitchGain);
+            glitchGain.connect(audioCtx.destination);
+            motorOsc.start();
+            lfoOsc.start();
+            glitchOsc.start();
+            audioEnabled = true;
+            log("AUDIO ENGINE: ONLINE");
+            const btn = document.getElementById('audioInitBtn');
+            if(btn) btn.style.display = 'none';
+        }
+
+        function updateAudio(speed) {
+            if(!audioEnabled) return;
+            const targetFreq = 50 + (speed * 400);
+            motorOsc.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.1);
+            filterNode.frequency.setTargetAtTime(200 + (speed * 2000), audioCtx.currentTime, 0.1);
+            let vol = 0.05 + (speed * 0.1);
+            if(speed <= 0.01) vol = 0; 
+            gainNode.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.1);
+        }
+
+        function triggerGlitchSound() {
+            if(!audioEnabled) return;
+            glitchOsc.frequency.setValueAtTime(200 + Math.random()*800, audioCtx.currentTime);
+            glitchGain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            glitchGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+        }
+
+        document.getElementById('audioInitBtn').addEventListener('click', initAudio);
+
+
+        // --- 2. CORE GRAPHICS INIT ---
+        const container = document.getElementById('canvas-container');
+        const loader = document.getElementById('loader');
+        
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 4, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); 
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        container.appendChild(renderer.domElement);
+
+        // --- 3. REAL-TIME REFLECTIONS ---
+        const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256);
+        const cubeCamera = new THREE.CubeCamera(0.1, 1000, cubeRenderTarget);
+        scene.add(cubeCamera);
+
+        // --- 4. POST-PROCESSING (GLITCH SHADER) ---
+        const renderTarget = new THREE.WebGLRenderTarget(
+            window.innerWidth * window.devicePixelRatio,
+            window.innerHeight * window.devicePixelRatio,
+            { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat }
+        );
+
+        const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        const postScene = new THREE.Scene();
+        
+        const postVertexShader = `
+            varying vec2 vUv;
+            void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+        `;
+
+        const postFragmentShader = `
+            uniform sampler2D tDiffuse;
+            uniform float time;
+            uniform float glitchStrength;
+            uniform float shakeStrength;
+            varying vec2 vUv;
+            float random(vec2 st) { return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123); }
+            void main() {
+                vec2 uv = vUv;
+                if (glitchStrength > 0.0) {
+                    float block = floor(uv.y * 20.0);
+                    float noise = random(vec2(block, time));
+                    if (noise < glitchStrength) uv.x += (random(vec2(time)) - 0.5) * 0.1;
+                }
+                uv += (vec2(random(uv + time), random(uv - time)) - 0.5) * shakeStrength;
+                float shift = 0.003 + shakeStrength * 0.02 + glitchStrength * 0.01;
+                float r = texture2D(tDiffuse, uv + vec2(shift, 0.0)).r;
+                float g = texture2D(tDiffuse, uv).g;
+                float b = texture2D(tDiffuse, uv - vec2(shift, 0.0)).b;
+                vec3 color = vec3(r, g, b);
+                float scanline = sin(uv.y * 800.0 + time * 10.0) * 0.04;
+                color -= scanline;
+                gl_FragColor = vec4(color, 1.0);
+            }
+        `;
+
+        const postMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                tDiffuse: { value: null },
+                time: { value: 0 },
+                shakeStrength: { value: 0 },
+                glitchStrength: { value: 0 }
+            },
+            vertexShader: postVertexShader,
+            fragmentShader: postFragmentShader
+        });
+
+        const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMaterial);
+        postScene.add(quad);
+
+
+        // --- 5. MATERIALS ---
+        function createCarbonMat() {
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x111111, roughness: 0.4, metalness: 0.8, envMap: cubeRenderTarget.texture, envMapIntensity: 1.0
+            });
+            mat.onBeforeCompile = (shader) => {
+                shader.uniforms.progress = { value: 0 };
+                shader.uniforms.time = { value: 0 };
+                shader.vertexShader = `varying vec3 vWPos;\n` + shader.vertexShader;
+                shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>\n vWPos = (modelMatrix * vec4(position, 1.0)).xyz;`);
+                shader.fragmentShader = `uniform float progress; uniform float time; varying vec3 vWPos;\n` + shader.fragmentShader;
+                shader.fragmentShader = shader.fragmentShader.replace('#include <dithering_fragment>', `
+                    #include <dithering_fragment>
+                    float grid = step(0.95, fract(vWPos.x*4.0)) + step(0.95, fract(vWPos.z*4.0));
+                    float scan = smoothstep(0.0, 0.2, sin(vWPos.y*10.0 - time*5.0));
+                    vec3 wireColor = vec3(0.0, 1.0, 1.0) * (grid + scan);
+                    float mixVal = smoothstep(0.0, 1.0, progress);
+                    gl_FragColor.rgb = mix(wireColor, gl_FragColor.rgb, mixVal);
+                    gl_FragColor.a = mix(0.5, 1.0, mixVal);
+                `);
+                mat.userData.shader = shader;
+            };
+            return mat;
+        }
+
+        const carbonMat = createCarbonMat();
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, roughness: 0.2, metalness: 1.0, envMap: cubeRenderTarget.texture });
+        const plasticMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8, metalness: 0.1 });
+
+
+        // --- 6. PROCEDURAL GEOMETRY ---
+        function createPropeller() {
+            const shape = new THREE.Shape();
+            shape.moveTo(0,0);
+            shape.quadraticCurveTo(0.2, 0.1, 0.4, 0);
+            shape.quadraticCurveTo(0.2, -0.05, 0, 0);
+            const geom = new THREE.ExtrudeGeometry(shape, {steps:10, depth:2.2, bevelEnabled:false});
+            geom.translate(0,0,0);
+            const pos = geom.attributes.position;
+            const v = new THREE.Vector3();
+            for(let i=0; i<pos.count; i++){
+                v.fromBufferAttribute(pos, i);
+                const angle = (v.z/2.2) * -0.6;
+                const x = v.x*Math.cos(angle) - v.y*Math.sin(angle);
+                const y = v.x*Math.sin(angle) + v.y*Math.cos(angle);
+                pos.setXY(i, x, y);
+            }
+            geom.computeVertexNormals();
+            return geom;
+        }
+        const propGeo = createPropeller();
+
+
+        // --- 7. ASSEMBLY SYSTEM ---
+        const parts = [];
+        const wires = [];
+
+        function register(mesh, end, offset, info) {
+            const start = end.clone().add(offset);
+            mesh.position.copy(start);
+            scene.add(mesh);
+            
+            mesh.userData.isPart = true;
+            mesh.userData.info = info;
+            
+            parts.push({
+                mesh: mesh,
+                start: start,
+                end: end,
+                rotStart: new THREE.Euler(Math.random()*Math.PI, Math.random()*Math.PI, 0),
+                rotEnd: mesh.rotation.clone()
+            });
+            return mesh;
+        }
+
+        // DRONE BUILD
+        const frameGrp = new THREE.Group();
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 4), carbonMat);
+        const arm2 = arm.clone(); arm2.rotation.y = Math.PI/2;
+        frameGrp.add(arm, arm2);
+        const plate = new THREE.Mesh(new THREE.CylinderGeometry(1,1,0.15,6), carbonMat);
+        frameGrp.add(plate);
+        register(frameGrp, new THREE.Vector3(0,0,0), new THREE.Vector3(0,-5,0), {
+            name: "TITAN X5 FRAME", 
+            desc: "Unibody X configuration. High-modulus T700 Carbon Fiber weave.",
+            specs: [{l:"MATERIAL", v:"T700 CARBON"}, {l:"WEIGHT", v:"110g"}, {l:"WHEELBASE", v:"225mm"}, {l:"THICKNESS", v:"5.5mm"}, {l:"MOUNTING", v:"30x30 / 20x20"}]
+        });
+
+        const motors = [];
+        const mPos = [{x:1.5,z:1.5}, {x:-1.5,z:1.5}, {x:1.5,z:-1.5}, {x:-1.5,z:-1.5}];
+        mPos.forEach((p, i) => {
+            const mGrp = new THREE.Group();
+            const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.5,16), goldMat);
+            mGrp.add(bell);
+            const props = new THREE.Group();
+            props.position.y = 0.3;
+            const b1 = new THREE.Mesh(propGeo, new THREE.MeshPhysicalMaterial({color:0x222222, transmission:0.5, opacity:0.8, transparent:true}));
+            const b2 = b1.clone(); b2.rotation.y = Math.PI*2/3;
+            const b3 = b1.clone(); b3.rotation.y = Math.PI*4/3;
+            props.add(b1, b2, b3);
+            mGrp.add(props);
+            
+            // Register mesh
+            const m = register(mGrp, new THREE.Vector3(p.x, 0.3, p.z), new THREE.Vector3(p.x*2, 5, p.z*2), {
+                name: "MOTOR 2306", 
+                desc: "High-torque brushless motor featuring N52 arc magnets.",
+                specs: [{l:"KV", v:"1750 KV"}, {l:"VOLTAGE", v:"6S"}, {l:"STATOR", v:"2306"}, {l:"PEAK PWR", v:"1800W"}, {l:"SHAFT", v:"TITANIUM"}]
+            });
+            
+            // FIXED: Assign prop reference AFTER registration to prevent overwrite
+            m.userData.prop = props;
+            motors.push(m);
+        });
+
+        const stack = register(new THREE.Mesh(new THREE.BoxGeometry(1,0.3,1), goldMat), new THREE.Vector3(0,0.5,0), new THREE.Vector3(0,3,0), {
+            name: "F7 STACK", 
+            desc: "Hybrid Flight Controller and ESC stack.",
+            specs: [{l:"MCU", v:"STM32 F722"}, {l:"GYRO", v:"DUAL ICM"}, {l:"ESC CURRENT", v:"60A"}, {l:"FIRMWARE", v:"BETAFLIGHT"}, {l:"BLACKBOX", v:"128MB"}]
+        });
+
+        const camGrp = new THREE.Group();
+        const camBody = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), carbonMat);
+        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.2, 16), goldMat);
+        lens.rotation.x = Math.PI/2; lens.position.z = 0.25;
+        camGrp.add(camBody, lens);
+        register(camGrp, new THREE.Vector3(0, 0.7, 1.5), new THREE.Vector3(0, 2, 3), {
+            name: "O3 AIR UNIT", 
+            desc: "Next-gen FPV transmission system.",
+            specs: [{l:"RESOLUTION", v:"4K 60FPS"}, {l:"LATENCY", v:"<28ms"}, {l:"FOV", v:"155 DEG"}, {l:"SENSOR", v:"1/1.7 CMOS"}, {l:"BITRATE", v:"50 MBPS"}]
+        });
+
+        const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8), plasticMat);
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.15), plasticMat);
+        bulb.position.y = 0.4;
+        ant.add(bulb);
+        ant.rotation.x = -Math.PI/4;
+        register(ant, new THREE.Vector3(0, 0.8, -1.5), new THREE.Vector3(0, 3, -3), {
+            name: "5.8G ANTENNA", 
+            desc: "Long-range omnidirectional antenna.",
+            specs: [{l:"GAIN", v:"2.5 dBi"}, {l:"POLARIZATION", v:"RHCP"}, {l:"VSWR", v:"< 1.2"}, {l:"CONNECTOR", v:"SMA"}, {l:"LENGTH", v:"120mm"}]
+        });
+
+        function addWire(objA, objB, offA, offB) {
+            const p1 = objA.position.clone().add(offA);
+            const p2 = objB.position.clone().add(offB);
+            const curve = new THREE.QuadraticBezierCurve3(p1, p1, p2); 
+            const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 10, 0.02, 6, false), plasticMat);
+            scene.add(mesh);
+            wires.push({mesh, objA, objB, offA, offB});
+        }
+        motors.forEach(m => {
+            const dir = new THREE.Vector3().copy(m.position).normalize().negate();
+            addWire(m, stack, new THREE.Vector3(dir.x*0.4,0,dir.z*0.4), new THREE.Vector3(dir.x*0.5,0,dir.z*0.5));
+        });
+
+
+        // --- 8. ENVIRONMENT ---
+        const ambient = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambient);
+        const light1 = new THREE.PointLight(0x00f3ff, 2, 20);
+        light1.position.set(5,5,5);
+        scene.add(light1);
+        const light2 = new THREE.PointLight(0xff9d00, 2, 20);
+        light2.position.set(-5,2,-5);
+        scene.add(light2);
+
+        const floorGeo = new THREE.PlaneGeometry(60, 60, 128, 128);
+        const floorMat = new THREE.ShaderMaterial({
+            uniforms: { time: {value:0} },
+            vertexShader: `varying vec3 vPos; uniform float time; void main() { vPos = position; float wave = sin(length(position.xy)*2.0 - time*2.0)*0.15; gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x, position.y, wave, 1.0); }`,
+            fragmentShader: `varying vec3 vPos; uniform float time; void main() { float grid = step(0.98, fract(vPos.x/2.0)) + step(0.98, fract(vPos.y/2.0)); float ring = smoothstep(0.2, 0.0, abs(sin(length(vPos.xy)*0.5 - time) - 0.5)); vec3 col = vec3(0.0, 0.2, 0.5) * grid; col += vec3(0.0, 0.8, 1.0) * ring; gl_FragColor = vec4(col, 1.0); }`,
+            transparent: true,
+            wireframe: true
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI/2;
+        floor.position.y = -4;
+        scene.add(floor);
+
+        const laserGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0)]);
+        const laser = new THREE.Line(laserGeo, new THREE.LineBasicMaterial({ color: 0x00f3ff, transparent: true, opacity: 0.6 }));
+        scene.add(laser);
+
+
+        // --- 9. ANIMATION LOOP ---
+        let progress = 0;
+        let prevProgress = 0;
+        let glitchIntensity = 0;
+        const slider = document.getElementById('assemblySlider');
+        const fill = document.getElementById('scrubberFill');
+        const thumb = document.getElementById('scrubberThumb');
+        
+        const ease = t => t<.5 ? 4*t*t*t : (t-1)*(2*t-2)*(2*t-2)+1;
+
+        function log(msg) {
+            const l = document.createElement('div');
+            l.className = 'log-line new';
+            l.innerText = msg;
+            terminal.appendChild(l);
+            if(terminal.children.length > 8) terminal.removeChild(terminal.firstChild);
+            setTimeout(() => l.classList.remove('new'), 100);
+        }
+
+        function triggerGlitch() {
+            glitchIntensity = 1.0;
+            triggerGlitchSound();
+        }
+
+        slider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            progress = val / 100;
+            fill.style.width = val + '%';
+            thumb.style.left = val + '%';
+            
+            if(val===10 && prevProgress < 0.1) { log("INITIATING ASSEMBLY..."); triggerGlitch(); }
+            if(val===30 && prevProgress < 0.3) { log("CHASSIS LOCK ENGAGED"); triggerGlitch(); }
+            if(val===50 && prevProgress < 0.5) { log("WIRING HARNESS CONNECTED"); triggerGlitch(); }
+            if(val===70 && prevProgress < 0.7) { log("AVIONICS ONLINE"); triggerGlitch(); }
+            if(val===90 && prevProgress < 0.9) { log("CALIBRATING GYROSCOPES..."); triggerGlitch(); }
+            if(val===100) { log("SYSTEM READY."); triggerGlitch(); }
+            
+            const stages = document.querySelectorAll('.stg');
+            stages.forEach((s, i) => {
+                if(i/5 <= progress) s.classList.add('active');
+                else s.classList.remove('active');
+            });
+            prevProgress = progress;
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const cursorDot = document.getElementById('cursorDot');
+        const cursorRing = document.getElementById('cursorRing');
+        const inspector = document.getElementById('inspector');
+        const specsContainer = document.getElementById('specsContainer');
+        const gridContainer = document.getElementById('gridContainer');
+        
+        document.addEventListener('mousemove', e => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            cursorDot.style.left = e.clientX + 'px';
+            cursorDot.style.top = e.clientY + 'px';
+            cursorRing.style.left = e.clientX + 'px';
+            cursorRing.style.top = e.clientY + 'px';
+        });
+
+        let camAngle = 0;
+        let camY = 4;
+        let motorSpeed = 0;
+        let hoveredObj = null;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now() * 0.001;
+            const t = ease(progress);
+
+            parts.forEach(p => {
+                p.mesh.position.lerpVectors(p.start, p.end, t);
+                p.mesh.rotation.x = THREE.MathUtils.lerp(p.rotStart.x, p.rotEnd.x, t);
+                p.mesh.rotation.y = THREE.MathUtils.lerp(p.rotStart.y, p.rotEnd.y, t);
+                p.mesh.rotation.z = THREE.MathUtils.lerp(p.rotStart.z, p.rotEnd.z, t);
+                if(p.mesh.material && p.mesh.material.userData.shader) {
+                    const s = p.mesh.material.userData.shader;
+                    s.uniforms.progress.value = t;
+                    s.uniforms.time.value = time;
+                }
+            });
+
+            wires.forEach(w => {
+                const p1 = w.objA.position.clone().add(w.offA);
+                const p2 = w.objB.position.clone().add(w.offB);
+                const mid = p1.clone().add(p2).multiplyScalar(0.5);
+                mid.y -= p1.distanceTo(p2) * 0.5 * (1-t); 
+                const curve = new THREE.QuadraticBezierCurve3(p1, mid, p2);
+                w.mesh.geometry.dispose();
+                w.mesh.geometry = new THREE.TubeGeometry(curve, 10, 0.02, 6, false);
+            });
+
+            if(progress > 0.95) {
+                motorSpeed = Math.min(motorSpeed + 0.02, 1.0);
+            } else {
+                motorSpeed = Math.max(motorSpeed - 0.01, 0);
+            }
+            
+            if(motorSpeed > 0.01) {
+                motors.forEach(m => {
+                    if(m.userData.prop) m.userData.prop.rotation.y += 0.8 * motorSpeed;
+                });
+            }
+            updateAudio(motorSpeed);
+
+            if(time % 2 < 0.02) { 
+                cubeCamera.position.copy(frameGrp.position);
+                cubeCamera.update(renderer, scene);
+            }
+            floorMat.uniforms.time.value = time;
+
+            if(glitchIntensity > 0) {
+                glitchIntensity -= 0.05;
+                if(glitchIntensity < 0) glitchIntensity = 0;
+            }
+            postMaterial.uniforms.glitchStrength.value = glitchIntensity;
+            postMaterial.uniforms.time.value = time;
+
+            camAngle += 0.002;
+            camera.position.x = Math.sin(camAngle) * (8 - progress*2);
+            camera.position.z = Math.cos(camAngle) * (8 - progress*2);
+            camY += ( (4 - progress) - camY ) * 0.05;
+            camera.position.y = camY + (Math.random()-0.5) * motorSpeed * 0.05; 
+            camera.lookAt(0,0,0);
+
+            // FIXED RAYCASTING (Ignore floor/laser)
+            const interactables = parts.map(p => p.mesh);
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactables, true);
+            
+            if(intersects.length > 0) {
+                let obj = intersects[0].object;
+                while(obj.parent && !obj.userData.isPart) obj = obj.parent;
+                
+                if(obj.userData.isPart) {
+                    hoveredObj = obj;
+                    cursorRing.classList.add('hovered');
+                    
+                    // Only show inspector if chat is NOT open on mobile
+                    if(window.innerWidth > 768 || !document.getElementById('chatContainer').classList.contains('active')) {
+                        inspector.classList.add('active');
+                    }
+                    
+                    const startVec = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(camera);
+                    const positions = laser.geometry.attributes.position.array;
+                    positions[0] = startVec.x; positions[1] = startVec.y; positions[2] = startVec.z;
+                    positions[3] = obj.position.x; positions[4] = obj.position.y; positions[5] = obj.position.z;
+                    laser.geometry.attributes.position.needsUpdate = true;
+                    laser.visible = true;
+
+                    const i = obj.userData.info;
+                    if(document.getElementById('partName').innerText !== i.name) {
+                        document.getElementById('partName').innerText = i.name;
+                        document.getElementById('partDesc').innerText = i.desc;
+                        specsContainer.innerHTML = '';
+                        gridContainer.innerHTML = '';
+                        if(i.specs) {
+                            i.specs.slice(0,3).forEach(s => {
+                                specsContainer.innerHTML += `<div class="stat-row"><span>${s.l}</span> <b>${s.v}</b></div>`;
+                            });
+                            i.specs.slice(3).forEach(s => {
+                                gridContainer.innerHTML += `<div class="spec-box"><small>${s.l}</small> <span>${s.v}</span></div>`;
+                            });
+                        }
+                    }
+                } else {
+                    cursorRing.classList.remove('hovered');
+                    inspector.classList.remove('active');
+                    laser.visible = false;
+                }
+            } else {
+                cursorRing.classList.remove('hovered');
+                inspector.classList.remove('active');
+                laser.visible = false;
+            }
+
+            renderer.setRenderTarget(renderTarget);
+            renderer.render(scene, camera);
+            renderer.setRenderTarget(null);
+            postMaterial.uniforms.tDiffuse.value = renderTarget.texture;
+            renderer.render(postScene, postCamera);
+        }
+
+        setTimeout(() => {
+            loader.style.opacity = 0;
+            setTimeout(() => loader.style.display='none', 800);
+        }, 2500);
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderTarget.setSize(window.innerWidth * window.devicePixelRatio, window.innerHeight * window.devicePixelRatio);
+            postMaterial.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
